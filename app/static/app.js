@@ -253,7 +253,7 @@
     els.listView.hidden = view !== "list";
     els.detailView.hidden = view !== "detail";
     els.filterBar.hidden = view !== "list" || state.totalRecipes === 0;
-    els.searchWrap.hidden = state.totalRecipes === 0;
+    els.searchWrap.hidden = view !== "list" || state.totalRecipes === 0;
 
     if (view !== "detail" && state.wakeLock) {
       state.wakeLock.release().catch(() => {});
@@ -426,7 +426,7 @@
       state.scale = 1;
       renderRecipeDetail(recipe);
       showView("detail");
-      window.scrollTo({ top: 0, behavior: "instant" });
+      window.scrollTo(0, 0);
     } catch (err) {
       showToast(err.message || "Recipe not found");
       window.location.hash = "#/";
