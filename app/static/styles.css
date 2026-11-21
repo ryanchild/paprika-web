@@ -1160,6 +1160,27 @@ body {
   }
 }
 
+/* Compact layout for short viewports like Apple HomeView (448x364) */
+@media (max-height: 460px) {
+  .topbar-inner {
+    padding: 8px 14px;
+  }
+
+  .main-container {
+    padding: 12px 14px 36px;
+  }
+
+  .detail-hero-text,
+  .detail-panel {
+    padding: 16px 18px;
+  }
+
+  .detail-hero-photo {
+    min-height: 180px;
+    max-height: 220px;
+  }
+}
+
 /* Print view */
 @media print {
   .topbar,

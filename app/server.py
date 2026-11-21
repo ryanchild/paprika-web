@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from app.db import RecipeStore
 from app.parser import parse_paprika_file
+from app.schema import render_recipe_html
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 CHUNK_SIZE = 65536
@@ -170,6 +171,28 @@ def make_handler(store: RecipeStore, max_upload_bytes: int):
                     cache_control="public, max-age=31536000, immutable",
                 )
                 return
+
+            # Server-rendered recipe page with Schema.org JSON-LD for HomeView Safari Cooking Mode
+            if path.startswith("/recipe/"):
+                uid = path[len("/recipe/") :].strip("/")
+                recipe = store.get_recipe(uid)
+                if recipe:
+                    host_hdr = self.headers.get("Host", "")
+                    proto = self.headers.get("X-Forwarded-Proto", "http")
+                    base_url = f"{proto}://{host_hdr}" if host_hdr else ""
+                    template_html = (STATIC_DIR / "index.html").read_text(
+                        encoding="utf-8"
+                    )
+                    html_bytes = render_recipe_html(
+                        template_html, recipe, base_url=base_url
+                    )
+                    self._send_bytes(
+                        html_bytes,
+                        "text/html; charset=utf-8",
+                        status=HTTPStatus.OK,
+                        extra_headers={"Cache-Control": "no-cache"},
+                    )
+                    return
 
             # Static assets
             if path in ("/", "/index.html"):

@@ -217,20 +217,50 @@
     renderRecipeList();
   }
 
+  function readInitialRecipe() {
+    const el = document.getElementById("initial-recipe");
+    if (!el) return null;
+    try {
+      return JSON.parse(el.textContent || "null");
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function refreshAll() {
     try {
+      const route = getRoute();
+      if (route.redirect) {
+        window.location.replace(route.redirect);
+        return;
+      }
+
+      if (route.view === "recipe") {
+        const initial = readInitialRecipe();
+        if (initial && initial.uid === route.uid) {
+          state.currentRecipe = initial;
+          state.scale = 1;
+          renderRecipeDetail(initial);
+          showView("detail");
+          loadCategories().catch(() => {});
+          return;
+        }
+        await loadCategories();
+        if (state.totalRecipes === 0) {
+          showView("empty");
+          return;
+        }
+        await openRecipeDetail(route.uid);
+        return;
+      }
+
       await loadCategories();
       if (state.totalRecipes === 0) {
         showView("empty");
         return;
       }
-      const route = getRoute();
-      if (route.view === "recipe") {
-        await openRecipeDetail(route.uid);
-      } else {
-        await loadRecipes();
-        showView("list");
-      }
+      await loadRecipes();
+      showView("list");
     } catch (err) {
       showToast(err.message || "Failed to load recipes");
       els.loadingView.hidden = true;
@@ -239,10 +269,16 @@
 
   /* Routing */
   function getRoute() {
-    const hash = window.location.hash || "#/";
-    const match = hash.match(/^#\/recipe\/(.+)$/);
-    if (match) {
-      return { view: "recipe", uid: decodeURIComponent(match[1]) };
+    const pathname = window.location.pathname || "/";
+    const pathMatch = pathname.match(/^\/recipe\/(.+?)\/?$/);
+    if (pathMatch) {
+      return { view: "recipe", uid: decodeURIComponent(pathMatch[1]) };
+    }
+    const hash = window.location.hash || "";
+    const hashMatch = hash.match(/^#\/recipe\/(.+)$/);
+    if (hashMatch) {
+      const uid = decodeURIComponent(hashMatch[1]);
+      return { view: "recipe", uid, redirect: `/recipe/${encodeURIComponent(uid)}` };
     }
     return { view: "list" };
   }
@@ -312,7 +348,7 @@
           .map((cat) => `<span class="tag">${escapeHtml(cat)}</span>`)
           .join("");
 
-        return `<a class="recipe-card" href="#/recipe/${encodeURIComponent(r.uid)}">
+        return `<a class="recipe-card" href="/recipe/${encodeURIComponent(r.uid)}">
           <div class="card-media">${mediaHtml}</div>
           <div class="card-body">
             <h2 class="card-title">${escapeHtml(r.name)}</h2>
@@ -429,7 +465,7 @@
       window.scrollTo(0, 0);
     } catch (err) {
       showToast(err.message || "Recipe not found");
-      window.location.hash = "#/";
+      window.location.href = "/";
     }
   }
 
@@ -508,7 +544,7 @@
 
     els.detailView.innerHTML = `
       <div class="detail-nav">
-        <a href="#/" class="btn btn-secondary">&larr; All Recipes</a>
+        <a href="/" class="btn btn-secondary">&larr; All Recipes</a>
         <div class="detail-tools">
           <button type="button" class="tool-chip" id="fontDecBtn" title="Smaller text" aria-label="Decrease text size">A&minus;</button>
           <button type="button" class="tool-chip" id="fontIncBtn" title="Larger text" aria-label="Increase text size">A+</button>
@@ -677,9 +713,7 @@
       if (!window.confirm(`Delete "${recipe.name}"?`)) return;
       try {
         await fetchJson(`/api/recipes/${encodeURIComponent(recipe.uid)}`, { method: "DELETE" });
-        showToast("Recipe deleted");
-        window.location.hash = "#/";
-        await refreshAll();
+        window.location.href = "/";
       } catch (err) {
         showToast(err.message || "Failed to delete recipe");
       }
@@ -799,7 +833,10 @@
         state.searchQuery = "";
         els.searchInput.value = "";
         els.clearSearchBtn.hidden = true;
-        window.location.hash = "#/";
+        if (window.location.pathname !== "/") {
+          window.location.href = "/";
+          return;
+        }
         await refreshAll();
         setTimeout(() => {
           if (!state.uploading) closeImportModal();
@@ -859,7 +896,10 @@
         await fetchJson("/api/recipes", { method: "DELETE" });
         closeImportModal();
         showToast("Library cleared");
-        window.location.hash = "#/";
+        if (window.location.pathname !== "/") {
+          window.location.href = "/";
+          return;
+        }
         await refreshAll();
       } catch (err) {
         showToast(err.message || "Failed to clear library");

@@ -147,6 +147,27 @@ class PaprikaWebTests(unittest.TestCase):
         self.assertIn("4 cloves garlic", detail["ingredients"])
         self.assertEqual(detail["rating"], 5)
 
+        # Server-rendered recipe page with Schema.org JSON-LD for HomeView Safari
+        status, page_html, headers = self._req("/recipe/uid-pasta")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", headers.get("Content-Type", ""))
+        html_text = page_html.decode("utf-8")
+        self.assertIn('<script type="application/ld+json">', html_text)
+        self.assertIn('<script id="initial-recipe" type="application/json">', html_text)
+        ld_start = html_text.index('<script type="application/ld+json">') + len(
+            '<script type="application/ld+json">'
+        )
+        ld_end = html_text.index("</script>", ld_start)
+        schema = json.loads(html_text[ld_start:ld_end])
+        self.assertEqual(schema["@type"], "Recipe")
+        self.assertEqual(schema["name"], "Garlic Butter Pasta")
+        self.assertEqual(schema["prepTime"], "PT10M")
+        self.assertEqual(schema["cookTime"], "PT15M")
+        self.assertEqual(len(schema["recipeIngredient"]), 3)
+        self.assertEqual(len(schema["recipeInstructions"]), 2)
+        self.assertEqual(schema["recipeInstructions"][0]["@type"], "HowToStep")
+        self.assertTrue(schema["image"][0].startswith("http://127.0.0.1:"))
+
         # Categories endpoint
         status, body, _ = self._req("/api/categories")
         self.assertEqual(status, 200)
